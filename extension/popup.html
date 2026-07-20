@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AutoFillAI</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="logo">
+          <span class="logo-badge">✦</span>
+          <span class="logo-text">AutoFillAI</span>
+        </div>
+        <span id="status-dot" class="status-dot offline" title="Not connected"></span>
+      </header>
+
+      <section id="setup-view" class="view">
+        <p class="hint">Connect your AutoFillAI account to enable one-click autofill on job applications.</p>
+
+        <label class="field-label">Dashboard URL</label>
+        <input id="base-url" type="text" placeholder="https://your-app.vercel.app" />
+
+        <label class="field-label">Access token</label>
+        <input id="api-token" type="password" placeholder="jaf_xxxxxxxxxxxxxxxx" />
+
+        <button id="connect-btn" class="btn btn-primary">Connect account</button>
+        <p id="setup-message" class="message"></p>
+
+        <a id="dashboard-link" class="link" href="#" target="_blank" rel="noreferrer">
+          Open dashboard to get a token →
+        </a>
+      </section>
+
+      <section id="main-view" class="view hidden">
+        <div class="account-card">
+          <p class="account-label">Connected account</p>
+          <p id="account-name" class="account-value">—</p>
+        </div>
+
+        <button id="start-btn" class="btn btn-start">
+          <span id="start-icon">▶</span>
+          <span id="start-text">Start Autofill</span>
+        </button>
+
+        <p id="result-message" class="message"></p>
+
+        <div id="last-results" class="results hidden"></div>
+
+        <button id="settings-btn" class="btn btn-secondary">Account settings</button>
+      </section>
+
+      <footer class="footer">
+        <span>Works on HTML, React, Vue &amp; Angular job forms</span>
+      </footer>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
