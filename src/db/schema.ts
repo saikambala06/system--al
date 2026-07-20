@@ -1,107 +1,148 @@
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  jsonb,
-  boolean,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-export const users = pgTable(
-  "users",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
-    email: text("email").notNull(),
-    passwordHash: text("password_hash").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+// Mongoose documents only serialize `_id` (an ObjectId) by default, not the
+// `id` string virtual, unless a schema explicitly opts in with
+// `toJSON: { virtuals: true }`. The frontend reads `.id` everywhere (list
+// keys, edit/delete calls), so without this every one of those was
+// `undefined` — e.g. delete requests silently hit `?id=undefined`.
+const jsonOptions = {
+  virtuals: true,
+  versionKey: false,
+  transform: (_doc: unknown, ret: Record<string, unknown>) => {
+    delete ret._id;
+    return ret;
   },
-  (table) => [uniqueIndex("users_email_idx").on(table.email)],
+};
+
+// ── User ──
+export interface IUser extends Document {
+  name: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const UserSchema = new Schema<IUser>(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+  },
+  { timestamps: true, toJSON: jsonOptions }
 );
 
-export const profiles = pgTable(
-  "profiles",
+export const User: Model<IUser> =
+  mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
+
+// ── Profile ──
+export interface IProfile extends Document {
+  userId: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  linkedin?: string;
+  website?: string;
+  resumeText?: string;
+  fields: Record<string, string>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ProfileSchema = new Schema<IProfile>(
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    firstName: text("first_name").default(""),
-    lastName: text("last_name").default(""),
-    email: text("email").default(""),
-    phone: text("phone").default(""),
-    address: text("address").default(""),
-    city: text("city").default(""),
-    state: text("state").default(""),
-    zip: text("zip").default(""),
-    country: text("country").default(""),
-    linkedin: text("linkedin").default(""),
-    github: text("github").default(""),
-    portfolio: text("portfolio").default(""),
-    website: text("website").default(""),
-    currentTitle: text("current_title").default(""),
-    currentCompany: text("current_company").default(""),
-    yearsExperience: text("years_experience").default(""),
-    expectedSalary: text("expected_salary").default(""),
-    noticePeriod: text("notice_period").default(""),
-    workAuthorization: text("work_authorization").default(""),
-    needsSponsorship: text("needs_sponsorship").default(""),
-    willingToRelocate: text("willing_to_relocate").default(""),
-    gender: text("gender").default(""),
-    veteranStatus: text("veteran_status").default(""),
-    disabilityStatus: text("disability_status").default(""),
-    race: text("race").default(""),
-    summary: text("summary").default(""),
-    coverLetter: text("cover_letter").default(""),
-    education: jsonb("education").$type<Record<string, unknown>[]>().default([]),
-    experience: jsonb("experience").$type<Record<string, unknown>[]>().default([]),
-    skills: jsonb("skills").$type<string[]>().default([]),
-    extra: jsonb("extra").$type<Record<string, string>>().default({}),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    name: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: { type: String, default: "" },
+    location: { type: String, default: "" },
+    linkedin: { type: String, default: "" },
+    website: { type: String, default: "" },
+    resumeText: { type: String, default: "" },
+    fields: { type: Schema.Types.Mixed, default: {} },
   },
-  (table) => [uniqueIndex("profiles_user_id_idx").on(table.userId)],
+  { timestamps: true, toJSON: jsonOptions }
 );
 
-export const qaPairs = pgTable(
-  "qa_pairs",
+export const Profile: Model<IProfile> =
+  mongoose.models.Profile || mongoose.model<IProfile>("Profile", ProfileSchema);
+
+// ── QuestionTemplate ──
+export interface IQuestionTemplate extends Document {
+  userId: mongoose.Types.ObjectId;
+  question: string;
+  answer: string;
+  category?: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const QuestionTemplateSchema = new Schema<IQuestionTemplate>(
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    question: text("question").notNull(),
-    questionNormalized: text("question_normalized").notNull(),
-    answer: text("answer").notNull(),
-    category: text("category").default("general"),
-    timesUsed: text("times_used").default("0"),
-    source: text("source").default("manual"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    question: { type: String, required: true },
+    answer: { type: String, required: true },
+    category: { type: String, default: "" },
+    tags: { type: [String], default: [] },
   },
-  (table) => [uniqueIndex("qa_pairs_user_question_idx").on(table.userId, table.questionNormalized)],
+  { timestamps: true, toJSON: jsonOptions }
 );
 
-export const apiTokens = pgTable("api_tokens", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  token: text("token").notNull(),
-  name: text("name").notNull().default("Browser Extension"),
-  isActive: boolean("is_active").notNull().default(true),
-  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("api_tokens_token_idx").on(table.token)]);
+export const QuestionTemplate: Model<IQuestionTemplate> =
+  mongoose.models.QuestionTemplate ||
+  mongoose.model<IQuestionTemplate>("QuestionTemplate", QuestionTemplateSchema);
 
-export const fillHistory = pgTable("fill_history", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  siteUrl: text("site_url").notNull(),
-  siteTitle: text("site_title").default(""),
-  fieldsFilled: text("fields_filled").default("0"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+// ── JobApplication ──
+export interface IJobApplication extends Document {
+  userId: mongoose.Types.ObjectId;
+  profileId?: mongoose.Types.ObjectId;
+  jobTitle: string;
+  company?: string;
+  jobUrl?: string;
+  status: string;
+  answers: Record<string, string>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const JobApplicationSchema = new Schema<IJobApplication>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    profileId: { type: Schema.Types.ObjectId, ref: "Profile", default: null },
+    jobTitle: { type: String, required: true },
+    company: { type: String, default: "" },
+    jobUrl: { type: String, default: "" },
+    status: { type: String, default: "pending" },
+    answers: { type: Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: true, toJSON: jsonOptions }
+);
+
+export const JobApplication: Model<IJobApplication> =
+  mongoose.models.JobApplication ||
+  mongoose.model<IJobApplication>("JobApplication", JobApplicationSchema);
+
+// ── Session ──
+export interface ISession extends Document {
+  userId: mongoose.Types.ObjectId;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+const SessionSchema = new Schema<ISession>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    token: { type: String, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
+// TTL index to auto-delete expired sessions
+SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const Session: Model<ISession> =
+  mongoose.models.Session || mongoose.model<ISession>("Session", SessionSchema);

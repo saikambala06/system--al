@@ -1,17 +1,24 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AutoFillAI — Smart Job Application Autofill",
+  title: "JobFill AI - Smart Job Application Auto-Fill",
   description:
-    "AI-powered dashboard and browser extension that instantly fills out job application forms with your saved answers.",
+    "Auto-fill job application forms across any job portal using AI-powered question matching.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#05040f] text-slate-100 antialiased">{children}</body>
+      <body className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white antialiased">
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,122 +1,197 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Lock, Mail, ArrowRight, AlertCircle } from "lucide-react";
-import AuthShell from "@/components/AuthShell";
-import { Suspense } from "react";
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState<"email" | "password" | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setError("");
     setLoading(true);
+
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
+
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
-        setLoading(false);
-        return;
+        setError(data.error || "Login failed");
+      } else {
+        router.push("/dashboard");
+        router.refresh();
       }
-      const next = searchParams.get("next") || "/dashboard";
-      router.push(next);
-      router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <AuthShell
-      title="Welcome back"
-      subtitle="Log in to manage your autofill profile and answers."
-      footer={
-        <>
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold text-fuchsia-300 hover:text-fuchsia-200">
-            Sign up free
-          </Link>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-300">Email address</label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder="you@example.com"
-              className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/60 focus:bg-white/[0.08] focus:ring-2 focus:ring-fuchsia-400/20"
-            />
-          </div>
-        </div>
+    <main className="relative flex min-h-screen items-center justify-center px-4 py-12">
+      {/* Background effects */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-brand-500/20 blur-[120px]" />
+        <div className="absolute -bottom-40 right-1/2 h-[500px] w-[500px] translate-x-1/2 rounded-full bg-violet-500/20 blur-[120px]" />
+      </div>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-300">Password</label>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/60 focus:bg-white/[0.08] focus:ring-2 focus:ring-fuchsia-400/20"
-            />
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-2 overflow-hidden rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-            >
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          type="submit"
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-600/30 transition disabled:opacity-70"
+      {/* Card */}
+      <div className="animate-fade-in w-full max-w-md">
+        {/* Logo */}
+        <Link
+          href="/"
+          className="mb-8 flex items-center justify-center gap-2"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Log in <ArrowRight className="h-4 w-4" /></>}
-        </motion.button>
-      </form>
-    </AuthShell>
-  );
-}
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 shadow-lg shadow-brand-500/30">
+            <svg
+              className="h-6 w-6 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+          </div>
+          <span className="text-xl font-bold">
+            Job<span className="text-brand-400">Fill</span> AI
+          </span>
+        </Link>
 
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
+        <div className="glass-strong rounded-3xl p-8 sm:p-10">
+          <h1 className="text-2xl font-bold">Welcome back</h1>
+          <p className="mt-2 text-slate-400">
+            Sign in to access your auto-fill dashboard
+          </p>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-sm font-medium text-slate-300"
+              >
+                Email
+              </label>
+              <div
+                className={`rounded-xl border transition-all duration-300 ${
+                  focused === "email"
+                    ? "border-brand-500 shadow-lg shadow-brand-500/10"
+                    : "border-slate-700/50"
+                }`}
+              >
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setFocused("email")}
+                  onBlur={() => setFocused(null)}
+                  required
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl bg-white/5 px-4 py-3 text-white placeholder-slate-500 outline-none transition-colors focus:bg-white/[0.07]"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-1.5 block text-sm font-medium text-slate-300"
+              >
+                Password
+              </label>
+              <div
+                className={`rounded-xl border transition-all duration-300 ${
+                  focused === "password"
+                    ? "border-brand-500 shadow-lg shadow-brand-500/10"
+                    : "border-slate-700/50"
+                }`}
+              >
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocused("password")}
+                  onBlur={() => setFocused(null)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full rounded-xl bg-white/5 px-4 py-3 text-white placeholder-slate-500 outline-none transition-colors focus:bg-white/[0.07]"
+                />
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="animate-slide-up rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-brand-500 to-violet-500 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-500/30 transition-all hover:shadow-xl hover:shadow-brand-500/40 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="h-5 w-5 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-slate-400">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/signup"
+              className="font-medium text-brand-400 hover:text-brand-300 transition-colors"
+            >
+              Create one
+            </Link>
+          </p>
+        </div>
+      </div>
+    </main>
   );
 }

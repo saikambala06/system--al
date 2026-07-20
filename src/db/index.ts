@@ -1,24 +1,49 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import mongoose from "mongoose";
 
-const databaseUrl = process.env.DATABASE_URL;
+const MONGODB_URI = process.env.MONGODB_URI!;
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+if (!MONGODB_URI) {
+  throw new Error("MONGODB_URI environment variable is required");
 }
 
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
+// Prevent multiple connections during hot reload in development
+const globalForMongoose = globalThis as typeof globalThis & {
+  __mongooseConn?: typeof mongoose;
+  __mongoosePromise?: Promise<typeof mongoose>;
 };
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
+const cached = globalForMongoose;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
+export async function connectDB(): Promise<typeof mongoose> {
+  if (cached.__mongooseConn) {
+    return cached.__mongooseConn;
+  }
+
+  if (!cached.__mongoosePromise) {
+    cached.__mongoosePromise = mongoose.connect(MONGODB_URI, {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000, // 5 second timeout
+      connectTimeoutMS: 5000,
+    });
+  }
+
+  try {
+    cached.__mongooseConn = await cached.__mongoosePromise;
+  } catch (e) {
+    cached.__mongoosePromise = undefined;
+    throw e;
+  }
+
+  return cached.__mongooseConn;
 }
 
-export const db = drizzle(pool);
+// Helper to ensure connection before any query (with timeout)
+export async function ensureDB(): Promise<void> {
+  if (mongoose.connection.readyState === 1) return;
+
+  try {
+    await connectDB();
+  } catch {
+    // Silently fail - the API route will handle errors
+  }
+}

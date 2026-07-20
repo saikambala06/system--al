@@ -1,48 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { createSessionToken, setSessionCookie, verifyPassword } from "@/lib/auth";
+import { User } from "@/db/schema";
+import { ensureDB } from "@/db";
+import { verifyPassword, createSession, setSessionCookie } from "@/lib/auth";
 import { z } from "zod";
 
-const schema = z.object({
-  email: z.string().email("Enter a valid email"),
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDB();
     const body = await request.json();
-    const parsed = schema.safeParse(body);
+    const parsed = loginSchema.safeParse(body);
+
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || "Invalid input" },
-        { status: 400 },
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
       );
     }
-    const normalizedEmail = parsed.data.email.toLowerCase().trim();
 
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, normalizedEmail))
-      .limit(1);
+    const { email, password } = parsed.data;
 
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    const valid = await verifyPassword(parsed.data.password, user.passwordHash);
+    const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    const token = await createSessionToken({ userId: user.id, email: user.email, name: user.name });
+    const token = await createSession(user._id.toString());
     await setSessionCookie(token);
 
-    return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } });
-  } catch (err) {
-    console.error("login error", err);
-    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
+    return NextResponse.json({
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
