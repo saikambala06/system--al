@@ -3,6 +3,6 @@
 // domain to "host_permissions" in manifest.json or the extension won't be
 // allowed to call it.
 const SKVK_CONFIG = {
-  API_BASE: 'https://your-project.vercel.app/api',
-  DASHBOARD_URL: 'https://your-project.vercel.app'
+  API_BASE: 'https://system-al.vercel.app//api',
+  DASHBOARD_URL: 'https://system-al.vercel.app'
 };
