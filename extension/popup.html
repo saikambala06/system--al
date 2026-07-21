@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="brand">
+    <span class="brand-mark">SK</span>
+    SKVK Autofill
+  </div>
+
+  <div id="loginView">
+    <div class="field">
+      <input type="email" id="email" placeholder="Email">
+    </div>
+    <div class="field">
+      <input type="password" id="password" placeholder="Password">
+    </div>
+    <button id="loginBtn" class="btn btn-primary btn-block">Log in</button>
+    <p id="loginError" class="error-text"></p>
+  </div>
+
+  <div id="appView" class="hidden">
+    <p class="muted">Logged in as <strong id="userEmail"></strong></p>
+    <button id="autofillBtn" class="btn btn-primary btn-block">Autofill this page</button>
+    <a id="dashboardLink" href="#" target="_blank" class="dashboard-link">Open dashboard</a>
+    <button id="logoutBtn" class="btn btn-ghost btn-block">Log out</button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

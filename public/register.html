@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create account - SKVK Autofill</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">SK</span>
+        SKVK Autofill
+      </a>
+      <h1>Create your account</h1>
+      <p class="auth-sub">One profile, filled in once, reused everywhere.</p>
+
+      <form id="registerForm">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" required minlength="6" autocomplete="new-password">
+        </div>
+        <p class="error-text" id="error"></p>
+        <button type="submit" class="btn btn-primary btn-block">Create account</button>
+      </form>
+
+      <p class="auth-switch">Already have an account? <a href="index.html">Log in</a></p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/register.js"></script>
+</body>
+</html>

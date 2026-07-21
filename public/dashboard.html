@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - SKVK Autofill</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <a href="dashboard.html" class="brand">
+      <span class="brand-mark">SK</span>
+      SKVK Autofill
+    </a>
+    <div class="app-header-right">
+      <span id="userGreeting"></span>
+      <button id="logoutBtn" class="btn-danger-text">Log out</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="profile-panel">Profile</button>
+      <button class="tab-btn" data-tab="qa-panel">Q&amp;A bank</button>
+      <button class="tab-btn" data-tab="extension-panel">Extension</button>
+    </nav>
+
+    <!-- ================= PROFILE ================= -->
+    <section id="profile-panel" class="tab-panel active">
+      <form id="profileForm">
+
+        <div class="section">
+          <h2>Personal</h2>
+          <div class="grid-3">
+            <div class="field"><label for="firstName">First name</label><input type="text" id="firstName"></div>
+            <div class="field"><label for="lastName">Last name</label><input type="text" id="lastName"></div>
+            <div class="field"><label for="email">Email</label><input type="email" id="email"></div>
+            <div class="field"><label for="phone">Phone</label><input type="tel" id="phone"></div>
+            <div class="field"><label for="address">Address</label><input type="text" id="address"></div>
+            <div class="field"><label for="city">City</label><input type="text" id="city"></div>
+            <div class="field"><label for="state">State / Province</label><input type="text" id="state"></div>
+            <div class="field"><label for="zip">ZIP / Postal code</label><input type="text" id="zip"></div>
+            <div class="field"><label for="country">Country</label><input type="text" id="country"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Links</h2>
+          <div class="grid-2">
+            <div class="field"><label for="linkedin">LinkedIn</label><input type="text" id="linkedin" placeholder="https://linkedin.com/in/..."></div>
+            <div class="field"><label for="github">GitHub</label><input type="text" id="github" placeholder="https://github.com/..."></div>
+            <div class="field"><label for="portfolio">Portfolio</label><input type="text" id="portfolio" placeholder="https://..."></div>
+            <div class="field"><label for="website">Website</label><input type="text" id="website" placeholder="https://..."></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Work authorization</h2>
+          <div class="grid-3">
+            <div class="field">
+              <label for="authorizedToWork">Authorized to work in your country</label>
+              <select id="authorizedToWork">
+                <option value="">Not set</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="requireSponsorship">Will you need visa sponsorship</label>
+              <select id="requireSponsorship">
+                <option value="">Not set</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div class="field"><label for="visaStatus">Visa status (if applicable)</label><input type="text" id="visaStatus"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Voluntary self-identification</h2>
+          <p class="auth-sub" style="margin-top:-8px">Some applications ask for this. Leave anything blank you'd rather not pre-fill.</p>
+          <div class="grid-2">
+            <div class="field"><label for="gender">Gender</label><input type="text" id="gender"></div>
+            <div class="field"><label for="race">Race / ethnicity</label><input type="text" id="race"></div>
+            <div class="field"><label for="veteranStatus">Veteran status</label><input type="text" id="veteranStatus"></div>
+            <div class="field"><label for="disabilityStatus">Disability status</label><input type="text" id="disabilityStatus"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Education</h2>
+          <div id="educationList"></div>
+          <button type="button" id="addEducation" class="add-row-btn">+ Add education</button>
+        </div>
+
+        <div class="section">
+          <h2>Experience</h2>
+          <div id="experienceList"></div>
+          <button type="button" id="addExperience" class="add-row-btn">+ Add experience</button>
+        </div>
+
+        <div class="section">
+          <h2>Skills &amp; preferences</h2>
+          <div class="field"><label for="skills">Skills (comma separated)</label><input type="text" id="skills" placeholder="React, Node.js, MongoDB, ..."></div>
+          <div class="grid-3">
+            <div class="field"><label for="desiredSalary">Desired salary</label><input type="text" id="desiredSalary"></div>
+            <div class="field">
+              <label for="willingToRelocate">Willing to relocate</label>
+              <select id="willingToRelocate">
+                <option value="">Not set</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="remotePreference">Work preference</label>
+              <select id="remotePreference">
+                <option value="">Not set</option>
+                <option value="Onsite">Onsite</option>
+                <option value="Hybrid">Hybrid</option>
+                <option value="Remote">Remote</option>
+              </select>
+            </div>
+            <div class="field"><label for="noticePeriod">Notice period</label><input type="text" id="noticePeriod"></div>
+            <div class="field"><label for="earliestStartDate">Earliest start date</label><input type="text" id="earliestStartDate"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Summary</h2>
+          <div class="field">
+            <label for="summary">Professional summary</label>
+            <textarea id="summary" placeholder="A couple of sentences the AI fallback can draw on when a question doesn't map to a fixed field."></textarea>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="btn btn-primary">Save profile</button>
+          <span class="status-text" id="profileStatus"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- ================= Q&A BANK ================= -->
+    <section id="qa-panel" class="tab-panel">
+      <div class="section">
+        <h2 id="qaFormTitle">Add Q&amp;A</h2>
+        <form id="qaForm">
+          <div class="field">
+            <label for="qaQuestion">Question</label>
+            <input type="text" id="qaQuestion" placeholder="e.g. Why are you interested in this role?" required>
+          </div>
+          <div class="field">
+            <label for="qaAnswer">Answer</label>
+            <textarea id="qaAnswer" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Save to bank</button>
+        </form>
+      </div>
+
+      <div class="section">
+        <h2>Saved answers</h2>
+        <table class="qa-ledger">
+          <thead>
+            <tr>
+              <th style="width:30%">Question</th>
+              <th style="width:34%">Answer</th>
+              <th>Source</th>
+              <th>Used</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="qaTableBody"></tbody>
+        </table>
+        <div id="qaEmptyState" class="empty-state hidden">Nothing saved yet - answers you add here, or that the extension generates on a new question, will show up in this list.</div>
+      </div>
+    </section>
+
+    <!-- ================= EXTENSION ================= -->
+    <section id="extension-panel" class="tab-panel">
+      <div class="section">
+        <h2>Connect the extension</h2>
+        <p>Load the <code>extension</code> folder from the project you downloaded as an unpacked extension in Chrome, then log in from its popup with this same email and password. Full steps are in <code>README.md</code>.</p>
+        <p>Before loading it, open <code>extension/config.js</code> and set <code>API_BASE</code> to this site's URL followed by <code>/api</code> - for example <code>https://your-project.vercel.app/api</code>.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
