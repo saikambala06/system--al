@@ -16,10 +16,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleLogin(message.email, message.password).then(sendResponse);
     return true;
   }
-  if (message.action === 'getProfile') {
-    handleGetProfile().then(sendResponse);
-    return true;
-  }
 });
 
 async function getToken() {
@@ -45,32 +41,6 @@ async function handleAutofillRequest(questions) {
 
     const data = await res.json();
     return { ok: true, results: data.results };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-// content.js needs the raw profile (not just single Q&A answers) so it can
-// fill repeating "Experience"/"Education" blocks itself - one block per
-// array entry - without a round trip per field. Same not-subject-to-CSP
-// reasoning as handleAutofillRequest above: this runs in the background
-// context, not the job site's page.
-async function handleGetProfile() {
-  try {
-    const token = await getToken();
-    if (!token) return { ok: false, error: 'not_logged_in' };
-
-    const res = await fetch(`${SKVK_CONFIG.API_BASE}/profile`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { ok: false, error: err.error || `Request failed (${res.status})` };
-    }
-
-    const profile = await res.json();
-    return { ok: true, profile };
   } catch (err) {
     return { ok: false, error: err.message };
   }

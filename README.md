@@ -9,21 +9,10 @@ A job application autofill system:
 ## How matching works
 
 1. The extension scans the visible fields on a page and reads their labels.
-2. Well-known profile fields (name, email, phone, address, LinkedIn/GitHub/portfolio, work authorization, sponsorship, salary expectations, notice period, EEO fields, etc.) are matched directly against your **Profile tab** data by label pattern (`src/utils/profileFields.js`) - no AI call, so these can't fail or drift out of date. If a label doesn't match a known profile field, it falls through to the next step.
-3. Each remaining question is compared against your saved Q&A bank using bigram Dice-coefficient similarity (a text-overlap score from 0 to 1, threshold 0.65 by default).
-4. A close match reuses the saved answer and bumps its use count.
-5. A new question is sent to Gemini along with your profile data. The generated answer is filled in **and** saved to your Q&A bank, so the same or a similarly-worded question won't need another AI call next time.
-6. Anything AI-generated is tagged "AI DRAFT" in the dashboard's Q&A bank tab - worth a glance; edit anything that isn't quite right and it'll be used verbatim from then on.
-
-## Repeating Experience / Education sections
-
-Some ATS pages (Workday in particular) don't show Experience/Education as flat fields - they start empty and require clicking "+ Add Experience" / "+ Add Education" once per entry, each click injecting a fresh block of fields. Before the generic pass above runs, the extension:
-
-1. Fetches your full profile (via a new `getProfile` message in `background.js`).
-2. Finds the "Add Experience"/"Add Education" button by matching its visible text.
-3. Clicks it once per entry in `profile.experience[]` / `profile.education[]`, diffing the DOM after each click to isolate exactly the fields that click just added (`extension/content.js`, `fillRepeatingSection`).
-4. Matches each new field's label against a small rule set (Company, Job Title, Location, Start/End Date, Currently work here, Description; School, Degree, Field of Study, GPA) and writes the corresponding value straight from that entry - no Q&A bank, no Gemini call, since these are exact facts you already typed into the Profile tab once.
-5. Whatever it recognizes is excluded from the generic field pass, so those specific facts are never re-derived by AI.
+2. Each question is compared against your saved Q&A bank using bigram Dice-coefficient similarity (a text-overlap score from 0 to 1, threshold 0.65 by default).
+3. A close match reuses the saved answer and bumps its use count.
+4. A new question is sent to Gemini along with your profile data. The generated answer is filled in **and** saved to your Q&A bank, so the same or a similarly-worded question won't need another AI call next time.
+5. Anything AI-generated is tagged "AI DRAFT" in the dashboard's Q&A bank tab - worth a glance; edit anything that isn't quite right and it'll be used verbatim from then on.
 
 The threshold is intentionally on the stricter side, biased toward not reusing an answer for the wrong question (e.g. "What's your name" vs "What's your phone number" should never cross-match) at the cost of occasionally re-asking Gemini for something a looser matcher would have reused. It's `MATCH_THRESHOLD` in `src/routes/autofill.js` if you want to tune it.
 
@@ -96,7 +85,6 @@ extension/               Chrome extension (Manifest V3)
 ## Limitations, honestly
 
 - Field detection works off visible labels, `aria-label`, `placeholder`, and nearby text - solid on standard HTML forms (Greenhouse, Lever, most company career pages). Heavily componentized UIs (some Workday instances in particular) sometimes render questions in ways that don't expose a clean label; if a field gets skipped, add it once via "Add Q&A" in the dashboard and it'll match next time a similarly-worded question shows up elsewhere.
-- The repeating Experience/Education handling (above) matches blocks to profile entries by click order, and matches sub-fields by label keyword. It doesn't yet handle Start/End Date fields split into separate Month + Year dropdowns (common on Workday) - those fall through unfilled rather than risk a wrong value. If the "Add Experience"/"Add Education" button text doesn't contain the word "experience"/"education", it won't be found and that section is skipped (the rest of the form still fills normally).
 - The AI fallback won't invent specific facts (dates, employer names) that aren't in your profile - fill in Experience/Education for anything you want it to cite exactly.
 - CORS on the API is left open, since JWT is the actual security boundary; tighten `cors()` in `src/app.js` if you'd rather restrict it to your own domain(s).
 - This fills forms - it doesn't submit them. Always review before hitting Submit, especially anything under "AI DRAFT."

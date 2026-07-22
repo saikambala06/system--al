@@ -13,22 +13,9 @@ function buildProfileContext(profile) {
   if (p.personal) {
     const fullName = `${p.personal.firstName || ''} ${p.personal.lastName || ''}`.trim();
     if (fullName) lines.push(`Name: ${fullName}`);
-    if (p.personal.firstName) lines.push(`First name: ${p.personal.firstName}`);
-    if (p.personal.lastName) lines.push(`Last name: ${p.personal.lastName}`);
-    if (p.personal.email) lines.push(`Email: ${p.personal.email}`);
-    if (p.personal.phone) lines.push(`Phone: ${p.personal.phone}`);
-    if (p.personal.address) lines.push(`Address: ${p.personal.address}`);
-    if (p.personal.zip) lines.push(`Zip/Postal code: ${p.personal.zip}`);
     if (p.personal.city || p.personal.state) {
       lines.push(`Location: ${[p.personal.city, p.personal.state, p.personal.country].filter(Boolean).join(', ')}`);
     }
-  }
-
-  if (p.links) {
-    if (p.links.linkedin) lines.push(`LinkedIn: ${p.links.linkedin}`);
-    if (p.links.github) lines.push(`GitHub: ${p.links.github}`);
-    if (p.links.portfolio) lines.push(`Portfolio: ${p.links.portfolio}`);
-    if (p.links.website) lines.push(`Website: ${p.links.website}`);
   }
 
   if (p.summary) lines.push(`Summary: ${p.summary}`);
@@ -52,14 +39,6 @@ function buildProfileContext(profile) {
   if (p.workAuth) {
     if (p.workAuth.authorizedToWork) lines.push(`Authorized to work in their country: ${p.workAuth.authorizedToWork}`);
     if (p.workAuth.requireSponsorship) lines.push(`Requires visa sponsorship: ${p.workAuth.requireSponsorship}`);
-    if (p.workAuth.visaStatus) lines.push(`Visa status: ${p.workAuth.visaStatus}`);
-  }
-
-  if (p.eeo) {
-    if (p.eeo.gender) lines.push(`Gender: ${p.eeo.gender}`);
-    if (p.eeo.race) lines.push(`Race/ethnicity: ${p.eeo.race}`);
-    if (p.eeo.veteranStatus) lines.push(`Veteran status: ${p.eeo.veteranStatus}`);
-    if (p.eeo.disabilityStatus) lines.push(`Disability status: ${p.eeo.disabilityStatus}`);
   }
 
   if (p.preferences) {
@@ -67,7 +46,6 @@ function buildProfileContext(profile) {
     if (p.preferences.willingToRelocate) lines.push(`Willing to relocate: ${p.preferences.willingToRelocate}`);
     if (p.preferences.remotePreference) lines.push(`Remote preference: ${p.preferences.remotePreference}`);
     if (p.preferences.noticePeriod) lines.push(`Notice period: ${p.preferences.noticePeriod}`);
-    if (p.preferences.earliestStartDate) lines.push(`Earliest start date: ${p.preferences.earliestStartDate}`);
   }
 
   return lines.length ? lines.join('\n') : 'No profile data available.';
@@ -93,7 +71,6 @@ Field type: ${fieldType || 'text'}${optionsLine}
 
 Rules:
 - If field type is "select", "radio", or "checkbox" and options are listed, respond with ONLY one of the exact option strings, nothing else.
-- If the question is asking for a direct profile value (name, email, phone, address, zip, LinkedIn/GitHub/portfolio/website URL, etc.) and that value is present in the profile above, return it verbatim - do not paraphrase, reformat, or add extra words.
 - Do not invent specific facts (dates, employer names, numbers) that are not in the profile. If the profile lacks the detail needed, give a brief, reasonable, professional response instead of fabricating specifics.
 - Keep free-text answers concise (1-3 sentences) unless the question clearly calls for more.
 - Respond with ONLY the answer text - no preamble, no quotation marks, no explanation.`;
