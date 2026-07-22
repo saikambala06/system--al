@@ -371,6 +371,32 @@
     return collectFields().filter((f) => !before.has(f.el) && after.has(f.el));
   }
 
+  // Splits a flat, DOM-order list of subfield-matching fields into one
+  // array per entry. Fields belonging to the same entry are contiguous in
+  // the DOM, so a new block starts the moment we see a key repeat (e.g. a
+  // second "Degree" field means we've crossed into entry #2) - this is what
+  // lets the code recognize "there are already 2 filled education blocks on
+  // this page" instead of assuming everything pre-rendered is a single
+  // block, which was the bug causing a second Autofill click to add brand
+  // new blank blocks on top of already-filled ones.
+  function groupIntoBlocks(fields, rules) {
+    const blocks = [];
+    let current = [];
+    let usedKeys = new Set();
+    for (const f of fields) {
+      const key = matchSubfield(f.label, rules);
+      if (usedKeys.has(key)) {
+        blocks.push(current);
+        current = [];
+        usedKeys = new Set();
+      }
+      current.push(f);
+      usedKeys.add(key);
+    }
+    if (current.length) blocks.push(current);
+    return blocks;
+  }
+
   // Fills one repeating section (experience or education). Returns:
   // - handled: every <el> this section claims ownership of (excluded from
   //   the generic Q&A/AI pass either way, since a generic pass has no idea
@@ -385,21 +411,27 @@
     const unresolved = [];
     if (!entries || entries.length === 0) return { handled, filled, unresolved };
 
-    const button = findClickable(ADD_BUTTON_PATTERNS[sectionName]);
-    if (!button) return { handled, filled, unresolved }; // page doesn't use this pattern
-
     const rules = SUBFIELD_RULES[sectionName];
-    const blocks = [];
 
-    // Some ATS forms render one entry by default before any click; treat
-    // any field already matching a subfield pattern as pre-existing block 0.
-    const preexisting = collectFields().filter((f) => matchSubfield(f.label, rules));
-    if (preexisting.length) blocks.push(preexisting);
+    // Read whatever the page already shows FIRST, before ever touching an
+    // "Add" button. Covers both ends of the spectrum: pages that render
+    // every entry's fields up front with no Add button at all (used to be
+    // skipped entirely), and a second Autofill run on a Workday-style page
+    // where N blocks are already sitting there filled from the first run.
+    const preexistingFields = collectFields().filter((f) => matchSubfield(f.label, rules));
+    const blocks = groupIntoBlocks(preexistingFields, rules);
 
-    while (blocks.length < entries.length) {
-      const newFields = await clickAndDiff(button);
-      if (newFields.length === 0) break; // button stopped adding blocks (e.g. site caps entries)
-      blocks.push(newFields);
+    // Only click "+ Add" for entries that don't already have a block on the
+    // page - never re-click just because Autofill ran again.
+    if (blocks.length < entries.length) {
+      const button = findClickable(ADD_BUTTON_PATTERNS[sectionName]);
+      if (button) {
+        while (blocks.length < entries.length) {
+          const newFields = await clickAndDiff(button);
+          if (newFields.length === 0) break; // button stopped adding blocks (e.g. site caps entries)
+          blocks.push(newFields);
+        }
+      }
     }
 
     blocks.forEach((block, i) => {
