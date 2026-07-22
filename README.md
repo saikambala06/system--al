@@ -9,10 +9,11 @@ A job application autofill system:
 ## How matching works
 
 1. The extension scans the visible fields on a page and reads their labels.
-2. Each question is compared against your saved Q&A bank using bigram Dice-coefficient similarity (a text-overlap score from 0 to 1, threshold 0.65 by default).
-3. A close match reuses the saved answer and bumps its use count.
-4. A new question is sent to Gemini along with your profile data. The generated answer is filled in **and** saved to your Q&A bank, so the same or a similarly-worded question won't need another AI call next time.
-5. Anything AI-generated is tagged "AI DRAFT" in the dashboard's Q&A bank tab - worth a glance; edit anything that isn't quite right and it'll be used verbatim from then on.
+2. Well-known profile fields (name, email, phone, address, LinkedIn/GitHub/portfolio, work authorization, sponsorship, salary expectations, notice period, EEO fields, etc.) are matched directly against your **Profile tab** data by label pattern (`src/utils/profileFields.js`) - no AI call, so these can't fail or drift out of date. If a label doesn't match a known profile field, it falls through to the next step.
+3. Each remaining question is compared against your saved Q&A bank using bigram Dice-coefficient similarity (a text-overlap score from 0 to 1, threshold 0.65 by default).
+4. A close match reuses the saved answer and bumps its use count.
+5. A new question is sent to Gemini along with your profile data. The generated answer is filled in **and** saved to your Q&A bank, so the same or a similarly-worded question won't need another AI call next time.
+6. Anything AI-generated is tagged "AI DRAFT" in the dashboard's Q&A bank tab - worth a glance; edit anything that isn't quite right and it'll be used verbatim from then on.
 
 The threshold is intentionally on the stricter side, biased toward not reusing an answer for the wrong question (e.g. "What's your name" vs "What's your phone number" should never cross-match) at the cost of occasionally re-asking Gemini for something a looser matcher would have reused. It's `MATCH_THRESHOLD` in `src/routes/autofill.js` if you want to tune it.
 

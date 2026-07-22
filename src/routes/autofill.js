@@ -5,6 +5,7 @@ const QAPair = require('../models/QAPair');
 const Profile = require('../models/Profile');
 const { findBestMatch } = require('../utils/similarity');
 const { generateAnswer } = require('../utils/gemini');
+const { matchProfileField } = require('../utils/profileFields');
 
 // How close a question has to be (0-1) to an existing bank entry before we
 // reuse its answer instead of asking Gemini for a fresh one. Biased toward
@@ -34,6 +35,16 @@ router.post('/batch', auth, async (req, res) => {
       const question = (q.question || '').trim();
       if (!question) {
         results.push({ question: q.question, answer: null, source: 'none', error: 'empty question' });
+        continue;
+      }
+
+      // Well-known profile fields (name, email, phone, address, work auth,
+      // etc.) are pulled straight from the Profile tab - no bank lookup, no
+      // Gemini call, so they can't fail or go stale the way an AI-generated
+      // or previously-cached answer can.
+      const profileMatch = matchProfileField(question, profile, q.fieldType, q.options);
+      if (profileMatch) {
+        results.push({ question, answer: profileMatch.value, source: 'profile' });
         continue;
       }
 
