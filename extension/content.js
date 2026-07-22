@@ -92,27 +92,74 @@
       .filter((g) => g.label);
   }
 
+  // ---- Native value setting that survives React/controlled-component forms ----
+  //
+  // Workday and similar ATS UIs (see: the "field is required" error that
+  // stays visible even after we've visibly typed a value into the box) use
+  // React-style controlled inputs. React attaches a hidden _valueTracker to
+  // the DOM node to remember "the last value I already know about" - if we
+  // only call the native value setter, React still thinks nothing changed,
+  // so the input/change events we dispatch get swallowed and its validation
+  // state (the red "required" message) never re-runs. Resetting the tracker
+  // first, plus doing a real focus/blur cycle (since many of these forms
+  // validate on blur rather than on change), fixes that.
   function setNativeValue(el, value) {
-    const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const proto = el.tagName === 'TEXTAREA'
+      ? window.HTMLTextAreaElement.prototype
+      : el.tagName === 'SELECT'
+        ? window.HTMLSelectElement.prototype
+        : window.HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+
+    const tracker = el._valueTracker;
+    if (tracker) tracker.setValue('');
+
+    el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
     setter.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
   }
 
+  function setNativeChecked(el, checked) {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked').set;
+    const tracker = el._valueTracker;
+    if (tracker) tracker.setValue(!checked);
+    setter.call(el, checked);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('click', { bubbles: true }));
+  }
+
+  // Fuzzy-matches free text against a <select>'s option labels. Returns the
+  // matching option's value, or null if nothing reasonable was found.
+  function matchSelectOption(el, answer) {
+    const lower = answer.trim().toLowerCase();
+    if (!lower) return null;
+    const opts = Array.from(el.options);
+    const exact = opts.find((o) => o.textContent.trim().toLowerCase() === lower);
+    if (exact) return exact.value;
+    const partial = opts.find((o) => o.textContent.trim().toLowerCase().includes(lower))
+      || opts.find((o) => lower.includes(o.textContent.trim().toLowerCase()) && o.textContent.trim().length > 2);
+    return partial ? partial.value : null;
+  }
+
+  // Returns true if a value was actually written.
   function fillField(field, answer) {
     const { el, fieldType } = field;
+    if (answer === undefined || answer === null || String(answer).trim() === '') return false;
+
     if (fieldType === 'text' || fieldType === 'textarea') {
-      setNativeValue(el, answer);
-    } else if (fieldType === 'select') {
-      const lower = answer.trim().toLowerCase();
-      const opt = Array.from(el.options).find((o) => o.textContent.trim().toLowerCase() === lower)
-        || Array.from(el.options).find((o) => o.textContent.trim().toLowerCase().includes(lower));
-      if (opt) {
-        el.value = opt.value;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+      setNativeValue(el, String(answer));
+      return true;
     }
+    if (fieldType === 'select') {
+      const value = matchSelectOption(el, String(answer));
+      if (value === null) return false;
+      setNativeValue(el, value);
+      return true;
+    }
+    return false;
   }
 
   function fillRadioGroup(group, answer) {
@@ -122,10 +169,110 @@
       return optLabel === lower || optLabel.includes(lower) || lower.includes(optLabel);
     });
     if (target) {
-      target.checked = true;
-      target.dispatchEvent(new Event('change', { bubbles: true }));
-      target.dispatchEvent(new Event('click', { bubbles: true }));
+      setNativeChecked(target, true);
+      return true;
     }
+    return false;
+  }
+
+  // ---- Date parsing/matching ----
+  //
+  // Saved experience/education dates are free text typed once in the
+  // Profile tab ("Jan 2022", "2020", "2022-06", "06/2022", etc). ATS forms
+  // render dates in all kinds of shapes: a single text box, an <input
+  // type="month">/type="date">, or - very commonly on Workday - separate
+  // Month / Day / Year <select> dropdowns that all sit under the same
+  // "Start Date" label. The old code tried to match the *whole* raw string
+  // against one dropdown's options and silently gave up the moment that
+  // didn't match exactly, which is why start/end dates were going in blank.
+  const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december'];
+
+  function parseDateValue(raw) {
+    if (!raw) return null;
+    const s = String(raw).trim();
+    let year = null, month = null, day = null, m;
+
+    if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) {
+      year = +m[1]; month = +m[2]; day = +m[3];
+    } else if ((m = s.match(/^(\d{4})-(\d{1,2})$/))) {
+      year = +m[1]; month = +m[2];
+    } else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) {
+      month = +m[1]; day = +m[2]; year = +m[3]; if (year < 100) year += 2000;
+    } else if ((m = s.match(/^(\d{1,2})\/(\d{2,4})$/))) {
+      month = +m[1]; year = +m[2]; if (year < 100) year += 2000;
+    } else if ((m = s.match(/([a-zA-Z]+)\.?\s+(\d{1,2}),?\s+(\d{4})/))) {
+      const idx = MONTH_NAMES.findIndex((n) => n.startsWith(m[1].toLowerCase().slice(0, 3)));
+      if (idx >= 0) { month = idx + 1; day = +m[2]; year = +m[3]; }
+    } else if ((m = s.match(/([a-zA-Z]+)\.?\s+(\d{4})/))) {
+      const idx = MONTH_NAMES.findIndex((n) => n.startsWith(m[1].toLowerCase().slice(0, 3)));
+      if (idx >= 0) { month = idx + 1; year = +m[2]; }
+    } else if ((m = s.match(/^(\d{4})$/))) {
+      year = +m[1];
+    }
+
+    if (year === null && month === null && day === null) return null;
+    return { year, month, day, monthName: month ? MONTH_NAMES[month - 1] : null };
+  }
+
+  // Figures out whether a <select>'s options represent months, days, or
+  // years, using both the field's own label ("Month", "Start Year", ...)
+  // and the shape of its option list as clues, then writes the matching
+  // part of the parsed date into it. Returns true only if it actually wrote
+  // something - callers must not mark the field "handled" on a false here,
+  // or it'll be silently skipped forever, which was the original bug.
+  function fillDateSelect(field, parsed) {
+    if (!parsed) return false;
+    const { el, label } = field;
+    const opts = Array.from(el.options).map((o) => ({ el: o, text: o.textContent.trim().toLowerCase(), value: o.value }));
+    const labelLower = (label || '').toLowerCase();
+
+    const monthOptCount = opts.filter((o) => MONTH_NAMES.some((n) => o.text === n || o.text.startsWith(n.slice(0, 3)))).length;
+    const numericOpts = opts.filter((o) => /^\d{1,4}$/.test(o.text));
+    const yearOptCount = numericOpts.filter((o) => +o.text >= 1900 && +o.text <= 2100).length;
+    const dayOptCount = numericOpts.filter((o) => +o.text >= 1 && +o.text <= 31).length;
+
+    const isMonth = /\bmonth\b/i.test(labelLower) || monthOptCount >= opts.length * 0.5;
+    const isYear = !isMonth && (/\byear\b/i.test(labelLower) || (yearOptCount >= opts.length * 0.5 && opts.length > 10));
+    const isDay = !isMonth && !isYear && (/\bday\b/i.test(labelLower) || (dayOptCount >= opts.length * 0.5 && opts.length <= 32));
+
+    let target = null;
+    if (isMonth && parsed.month) {
+      target = opts.find((o) => o.text === parsed.monthName
+        || o.text === String(parsed.month)
+        || o.text === String(parsed.month).padStart(2, '0')
+        || o.text.startsWith(parsed.monthName.slice(0, 3)));
+    } else if (isYear && parsed.year) {
+      target = opts.find((o) => o.text === String(parsed.year));
+    } else if (isDay && parsed.day) {
+      target = opts.find((o) => o.text === String(parsed.day) || o.text === String(parsed.day).padStart(2, '0'));
+    } else {
+      // Not clearly split by part (e.g. a single "Jan 2022"-style dropdown) -
+      // fall back to matching the whole formatted string against options.
+      const combined = [parsed.monthName, parsed.year].filter(Boolean).join(' ');
+      target = opts.find((o) => o.text === combined || (combined && o.text.includes(combined)));
+    }
+
+    if (!target) return false;
+    setNativeValue(el, target.value);
+    return true;
+  }
+
+  // For plain text/date-type inputs, reformat the saved free-text date to
+  // match what the input is expecting (yyyy-mm-dd for type="date", yyyy-mm
+  // for type="month"); otherwise leave the original text as-is since it's
+  // already a reasonable human-readable string ("Jan 2022").
+  function formatDateForTextField(el, parsed, rawValue) {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (parsed && parsed.year && parsed.month) {
+      if (type === 'date') {
+        return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${String(parsed.day || 1).padStart(2, '0')}`;
+      }
+      if (type === 'month') {
+        return `${parsed.year}-${String(parsed.month).padStart(2, '0')}`;
+      }
+    }
+    return rawValue;
   }
 
   // ---- Repeating "Experience" / "Education" section handling ----
@@ -146,6 +293,12 @@
   // and re-deriving them via AI or bigram matching per field is both
   // unnecessary and the thing the README explicitly says the AI fallback
   // should never be asked to invent.
+  //
+  // Exception: a saved field that doesn't map onto any of the page's
+  // dropdown options as-is (most commonly "Degree" - e.g. saved as
+  // "Bachelor's" but the site's <select> only offers "Bachelor's Degree")
+  // gets queued and resolved via the same AI pipeline used for everything
+  // else, instead of being left blank. See resolveUnmatchedFields below.
 
   const ADD_BUTTON_PATTERNS = {
     experience: /\+?\s*add\s*(work(ing)?\s*)?experience\b/i,
@@ -171,6 +324,8 @@
       { test: /\bgpa\b/i, key: 'gpa' }
     ]
   };
+
+  const DATE_KEYS = new Set(['startDate', 'endDate']);
 
   function matchSubfield(label, rules) {
     let best = null;
@@ -216,15 +371,22 @@
     return collectFields().filter((f) => !before.has(f.el) && after.has(f.el));
   }
 
-  // Fills one repeating section (experience or education) and returns the
-  // set of <el> nodes it handled, so the generic pass below can skip them.
+  // Fills one repeating section (experience or education). Returns:
+  // - handled: every <el> this section claims ownership of (excluded from
+  //   the generic Q&A/AI pass either way, since a generic pass has no idea
+  //   these are tied to array entries)
+  // - filled: the subset that actually got a value written directly
+  // - unresolved: fields this section recognized but couldn't fill on its
+  //   own (bad select match, unparsable date) - queued for the AI fallback
+  //   pass instead of being left silently blank
   async function fillRepeatingSection(sectionName, entries) {
-    const handled = new Set(); // excluded from the generic Q&A/AI pass either way
-    const filled = new Set(); // actually got a value written in
-    if (!entries || entries.length === 0) return { handled, filled };
+    const handled = new Set();
+    const filled = new Set();
+    const unresolved = [];
+    if (!entries || entries.length === 0) return { handled, filled, unresolved };
 
     const button = findClickable(ADD_BUTTON_PATTERNS[sectionName]);
-    if (!button) return { handled, filled }; // page doesn't use this pattern - nothing to do
+    if (!button) return { handled, filled, unresolved }; // page doesn't use this pattern
 
     const rules = SUBFIELD_RULES[sectionName];
     const blocks = [];
@@ -250,20 +412,37 @@
 
         if (key === 'current') {
           if (field.fieldType === 'select') {
-            fillField(field, entry.current ? 'Yes' : 'No');
-            filled.add(field.el);
+            if (fillField(field, entry.current ? 'Yes' : 'No')) filled.add(field.el);
           }
           return; // checkboxes for "current" are handled via radioGroups pass below
         }
 
         const value = entry[key];
-        if (value === undefined || value === null || String(value).trim() === '') return;
-        fillField(field, String(value));
-        filled.add(field.el);
+        const hasValue = value !== undefined && value !== null && String(value).trim() !== '';
+
+        if (DATE_KEYS.has(key)) {
+          if (!hasValue) return;
+          const parsed = parseDateValue(value);
+          let ok;
+          if (field.fieldType === 'select') {
+            ok = fillDateSelect(field, parsed);
+          } else {
+            setNativeValue(field.el, formatDateForTextField(field.el, parsed, String(value)));
+            ok = true;
+          }
+          if (ok) filled.add(field.el);
+          else unresolved.push({ field, rawValue: String(value), context: `${sectionName} ${key} ("${value}") for ${entry.title || entry.degree || entry.school || entry.company || ''}` });
+          return;
+        }
+
+        if (!hasValue) return;
+        const ok = fillField(field, String(value));
+        if (ok) filled.add(field.el);
+        else unresolved.push({ field, rawValue: String(value), context: `${sectionName} ${key} ("${value}")` });
       });
     });
 
-    return { handled, filled };
+    return { handled, filled, unresolved };
   }
 
   async function fillRepeatingCheckboxes(sectionName, entries) {
@@ -278,12 +457,40 @@
       const wantChecked = !!entry.current;
       const checkbox = g.els.find((el) => el.type === 'checkbox');
       if (checkbox && checkbox.checked !== wantChecked) {
-        checkbox.click();
+        setNativeChecked(checkbox, wantChecked);
       }
       g.els.forEach((el) => handled.add(el));
       filled.add(checkbox || g.els[0]);
     });
     return { handled, filled };
+  }
+
+  // Fields the deterministic pass couldn't resolve (typically: a saved
+  // degree string that doesn't line up with the page's dropdown wording)
+  // get one more shot through the same backend batch pipeline everything
+  // else uses - it already knows how to match/normalize a value against a
+  // fixed option list via Gemini, so there's no need for a second code path.
+  async function resolveUnmatchedFields(unresolved) {
+    if (!unresolved.length) return 0;
+
+    const questions = unresolved.map((u) => ({
+      question: `${u.context}. Pick the option that best matches "${u.rawValue}".`,
+      fieldType: u.field.fieldType,
+      options: u.field.options
+    }));
+
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'autofillRequest', questions }, resolve);
+    });
+
+    if (!response || !response.ok) return 0;
+
+    let count = 0;
+    unresolved.forEach((u, idx) => {
+      const r = response.results[idx];
+      if (r && r.answer && fillField(u.field, r.answer)) count++;
+    });
+    return count;
   }
 
   function showToast(msg) {
@@ -312,6 +519,7 @@
     const profile = await getProfile();
     const handledEls = new Set();
     const filledEls = new Set();
+    let pendingUnresolved = [];
 
     // Experience/education first: adding blocks changes what collectFields()
     // returns afterward, so the generic pass below needs to run on the DOM
@@ -321,15 +529,27 @@
       // Sequential on purpose: each call clicks buttons and diffs the DOM
       // against its own before/after snapshot, so two of these running at
       // once would see each other's newly-added fields and misattribute them.
-      const results = [
-        await fillRepeatingSection('experience', profile.experience),
-        await fillRepeatingSection('education', profile.education),
-        await fillRepeatingCheckboxes('experience', profile.experience)
-      ];
-      results.forEach(({ handled, filled }) => {
-        handled.forEach((el) => handledEls.add(el));
-        filled.forEach((el) => filledEls.add(el));
+      const expResult = await fillRepeatingSection('experience', profile.experience);
+      const eduResult = await fillRepeatingSection('education', profile.education);
+      const checkResult = await fillRepeatingCheckboxes('experience', profile.experience);
+
+      [expResult, eduResult, checkResult].forEach((r) => {
+        r.handled.forEach((el) => handledEls.add(el));
+        r.filled.forEach((el) => filledEls.add(el));
       });
+      pendingUnresolved = [...(expResult.unresolved || []), ...(eduResult.unresolved || [])];
+    }
+
+    if (pendingUnresolved.length) {
+      showToast('Matching degree/date fields...');
+      const resolvedCount = await resolveUnmatchedFields(pendingUnresolved);
+      // Whether or not the AI pass found a match, these els were already
+      // counted in handledEls above and should now also count as filled if
+      // resolveUnmatchedFields succeeded on them.
+      pendingUnresolved.forEach((u) => {
+        if (u.field.el.value) filledEls.add(u.field.el);
+      });
+      void resolvedCount;
     }
 
     const fields = collectFields().filter((f) => !handledEls.has(f.el));
@@ -341,7 +561,8 @@
     ];
 
     if (questions.length === 0) {
-      showToast('No recognizable fields found on this page.');
+      const totalFields = handledEls.size;
+      showToast(totalFields ? `Filled ${filledEls.size} of ${totalFields} fields. Review before submitting.` : 'No recognizable fields found on this page.');
       return;
     }
 
@@ -361,17 +582,11 @@
 
       for (const f of fields) {
         const r = response.results[idx++];
-        if (r && r.answer) {
-          fillField(f, r.answer);
-          filledCount++;
-        }
+        if (r && r.answer && fillField(f, r.answer)) filledCount++;
       }
       for (const g of radioGroups) {
         const r = response.results[idx++];
-        if (r && r.answer) {
-          fillRadioGroup(g, r.answer);
-          filledCount++;
-        }
+        if (r && r.answer && fillRadioGroup(g, r.answer)) filledCount++;
       }
 
       const totalFields = questions.length + handledEls.size;
