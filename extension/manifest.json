@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Fills job application forms from your saved profile and a growing Q&A bank, asking Gemini to draft an answer the first time it sees a new question.",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://*.vercel.app/*"],
+  "host_permissions": ["https://system-al.vercel.app/*"],
   "background": {
     "service_worker": "background.js"
   },
