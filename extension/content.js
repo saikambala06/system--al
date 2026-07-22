@@ -309,7 +309,17 @@
     experience: [
       { test: /\bjob\s*title\b|\btitle\b|\bposition\b|\brole\b/i, key: 'title' },
       { test: /\bcompany\b|\bemployer\b|\borganization\b/i, key: 'company' },
-      { test: /\blocation\b|\bcity\b/i, key: 'location' },
+      { test: /\bcity\b/i, key: 'location' },
+      // Country/State on an Employment History block describe where THAT JOB
+      // was, not the applicant's own address - they must not resolve through
+      // the generic profile lookup (which would wrongly fill in the
+      // applicant's personal country/state). There's no structured data for
+      // a past job's country/state, so these always go through the AI
+      // fallback pass using the entry's free-text `location`, never a direct
+      // profile field.
+      { test: /\bcountry\b/i, key: 'country' },
+      { test: /\bstate\b|\bprovince\b/i, key: 'state' },
+      { test: /\blocation\b/i, key: 'location' },
       { test: /\b(currently|current(ly)?\s*work|i\s*(currently\s*)?work\s*here|present)\b/i, key: 'current' },
       { test: /\bstart\s*date\b|\bfrom\b/i, key: 'startDate' },
       { test: /\bend\s*date\b|\bto\b/i, key: 'endDate' },
@@ -405,20 +415,30 @@
   // - unresolved: fields this section recognized but couldn't fill on its
   //   own (bad select match, unparsable date) - queued for the AI fallback
   //   pass instead of being left silently blank
-  async function fillRepeatingSection(sectionName, entries) {
+  async function fillRepeatingSection(sectionName, entries, excludeEls) {
     const handled = new Set();
     const filled = new Set();
     const unresolved = [];
     if (!entries || entries.length === 0) return { handled, filled, unresolved };
 
     const rules = SUBFIELD_RULES[sectionName];
+    const exclude = excludeEls || new Set();
 
     // Read whatever the page already shows FIRST, before ever touching an
     // "Add" button. Covers both ends of the spectrum: pages that render
     // every entry's fields up front with no Add button at all (used to be
     // skipped entirely), and a second Autofill run on a Workday-style page
     // where N blocks are already sitting there filled from the first run.
-    const preexistingFields = collectFields().filter((f) => matchSubfield(f.label, rules));
+    //
+    // Excluding fields another section already claimed matters because
+    // "Start Date"/"End Date" (and other labels) can legitimately appear in
+    // both Experience and Education blocks with identical wording - without
+    // this, running education's scan after experience's would sweep up
+    // experience's already-filled date fields, throwing off the block count
+    // (sometimes making Education think it already has enough blocks and
+    // skip clicking "+ Add Education" entirely) and occasionally overwriting
+    // an experience date with an education one.
+    const preexistingFields = collectFields().filter((f) => !exclude.has(f.el) && matchSubfield(f.label, rules));
     const blocks = groupIntoBlocks(preexistingFields, rules);
 
     // Only click "+ Add" for entries that don't already have a block on the
@@ -447,6 +467,25 @@
             if (fillField(field, entry.current ? 'Yes' : 'No')) filled.add(field.el);
           }
           return; // checkboxes for "current" are handled via radioGroups pass below
+        }
+
+        if (key === 'country' || key === 'state') {
+          // No structured country/state data exists for a past job - only
+          // the free-text `location` the person typed once. Resolve it via
+          // the AI pass using that specific entry's location as context, so
+          // it never falls through to the generic profile lookup (which
+          // would otherwise wrongly fill in the applicant's own home
+          // country/state here).
+          const loc = entry.location;
+          if (loc && String(loc).trim()) {
+            const label = key === 'country' ? 'Country' : 'State/Province';
+            unresolved.push({
+              field,
+              rawValue: String(loc),
+              context: `${label} of the employer for this job (job location on file: "${loc}", role: ${entry.title || ''} at ${entry.company || ''})`
+            });
+          }
+          return;
         }
 
         const value = entry[key];
@@ -562,7 +601,7 @@
       // against its own before/after snapshot, so two of these running at
       // once would see each other's newly-added fields and misattribute them.
       const expResult = await fillRepeatingSection('experience', profile.experience);
-      const eduResult = await fillRepeatingSection('education', profile.education);
+      const eduResult = await fillRepeatingSection('education', profile.education, expResult.handled);
       const checkResult = await fillRepeatingCheckboxes('experience', profile.experience);
 
       [expResult, eduResult, checkResult].forEach((r) => {
